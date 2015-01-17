@@ -8,6 +8,7 @@ using JetBrains.Annotations;
 using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Data.Entity.Relational;
 using Microsoft.Data.Entity.Utilities;
+using Microsoft.Framework.ConfigurationModel;
 using Microsoft.Framework.DependencyInjection;
 
 namespace Microsoft.Data.Entity.SqlServer
@@ -26,9 +27,12 @@ namespace Microsoft.Data.Entity.SqlServer
             [param:CanBeNull]
             set
             {
+                if (value <= 0)
+                {
+                    throw new InvalidOperationException(Strings.MaxBatchSizeMustBePositive);
+                }
                 _maxBatchSize = value;
             }
-
         }
 
         protected override void Configure(IReadOnlyDictionary<string, string> rawOptions)
@@ -36,14 +40,14 @@ namespace Microsoft.Data.Entity.SqlServer
             base.Configure(rawOptions);
             if (!_maxBatchSize.HasValue)
             {
-                var MaxBatchSizeConfigurationKey = ProviderPrefix + ":" + MaxBatchSizeKey;
+                var maxBatchSizeConfigurationKey = ProviderPrefix + Constants.KeyDelimiter + MaxBatchSizeKey;
                 string maxBatchSizeString;
-                if (rawOptions.TryGetValue(MaxBatchSizeConfigurationKey, out maxBatchSizeString))
+                if (rawOptions.TryGetValue(maxBatchSizeConfigurationKey, out maxBatchSizeString))
                 {
                     int maxBatchSizeInt;
                     if (!Int32.TryParse(maxBatchSizeString, out maxBatchSizeInt))
                     {
-                        throw new InvalidOperationException(Strings.IntegerConfigurationValueFormatError(MaxBatchSizeConfigurationKey, maxBatchSizeString));
+                        throw new InvalidOperationException(Strings.IntegerConfigurationValueFormatError(maxBatchSizeConfigurationKey, maxBatchSizeString));
                     }
                     _maxBatchSize = maxBatchSizeInt;
                 }

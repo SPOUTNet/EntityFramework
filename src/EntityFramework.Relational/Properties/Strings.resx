@@ -222,4 +222,7 @@
   <data name="InvalidCommandTimeout" xml:space="preserve">
     <value>The specified CommandTimeout value is not valid. It must be a positive number.</value>
   </data>
+  <data name="IntegerConfigurationValueFormatError" xml:space="preserve">
+    <value>The value for the configuration entry '{configurationKey}' is '{invalidValue}', but an integer is expected.</value>
+  </data>
 </root>

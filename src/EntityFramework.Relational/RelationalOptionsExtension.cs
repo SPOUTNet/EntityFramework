@@ -14,6 +14,7 @@ namespace Microsoft.Data.Entity.Relational
     public abstract class RelationalOptionsExtension : DbContextOptionsExtension
     {
         private const string ConnectionStringKey = "ConnectionString";
+        private const string CommandTimeoutKey = "CommandTimeout";
 
         private string _connectionString;
         private DbConnection _connection;
@@ -65,6 +66,19 @@ namespace Microsoft.Data.Entity.Relational
             if (string.IsNullOrEmpty(_connectionString))
             {
                 rawOptions.TryGetValue(ConnectionStringKey, out _connectionString);
+            }
+            if (!_commandTimeout.HasValue)
+            {
+                string commandTimeoutString;
+                if (rawOptions.TryGetValue(CommandTimeoutKey, out commandTimeoutString))
+                {
+                    int commandTimeoutInt;
+                    if (!Int32.TryParse(commandTimeoutString, out commandTimeoutInt))
+                    {
+                        throw new InvalidOperationException(Strings.IntegerConfigurationValueFormatError(CommandTimeoutKey, commandTimeoutString));
+                    }
+                    _commandTimeout = commandTimeoutInt;
+                }
             }
         }
 

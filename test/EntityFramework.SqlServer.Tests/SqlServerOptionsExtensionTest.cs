@@ -3,23 +3,22 @@
 
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Data.Entity.Infrastructure;
 using Microsoft.Framework.DependencyInjection;
-using Moq;
 using Xunit;
 
 namespace Microsoft.Data.Entity.SqlServer.Tests
 {
     public class SqlServerOptionsExtensionTest
     {
+        private const string MaxBatchSizeKey = "SqlServer:MaxBatchSize";
+
         private static readonly MethodInfo _applyServices
             = typeof(SqlServerOptionsExtension).GetTypeInfo().DeclaredMethods.Single(m => m.Name == "ApplyServices");
 
         [Fact]
-        public void Adds_SQL_server_services()
+        public void ApplyServices_adds_SQL_server_services()
         {
             var services = new ServiceCollection();
             var builder = new EntityServicesBuilder(services);
@@ -30,56 +29,68 @@ namespace Microsoft.Data.Entity.SqlServer.Tests
         }
 
         [Fact]
-        public void Can_access_properties()
+        public void Can_set_MaxBatchSize()
         {
-            var configuration = new SqlServerOptionsExtension();
+            var optionsExtension = new SqlServerOptionsExtension();
 
-            Assert.Null(configuration.Connection);
-            Assert.Null(configuration.ConnectionString);
-            Assert.Null(configuration.MaxBatchSize);
+            Assert.Null(optionsExtension.MaxBatchSize);
 
-            var connection = Mock.Of<DbConnection>();
-            configuration.Connection = connection;
-            configuration.ConnectionString = "Fraggle=Rock";
-            configuration.MaxBatchSize = 1;
-
-            Assert.Same(connection, configuration.Connection);
-            Assert.Equal("Fraggle=Rock", configuration.ConnectionString);
-            Assert.Equal(1, configuration.MaxBatchSize);
-        }
-
-        [Fact]
-        public void Configures_max_batch_size_specified_in_dbContext_options()
-        {
-            IDbContextOptions options = new DbContextOptions();
-            options.RawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "SqlServer:MaxBatchSize", "1" } };
-            options.AddExtension(new SqlServerOptionsExtension());
-
-            var optionsExtension = options.Extensions.OfType<SqlServerOptionsExtension>().First();
+            optionsExtension.MaxBatchSize = 1;
 
             Assert.Equal(1, optionsExtension.MaxBatchSize);
         }
 
         [Fact]
-        public void MaxBatchSize_in_sqlServerOptionsExtension_is_optional()
+        public void Throws_if_MaxBatchSize_out_of_range()
         {
-            IDbContextOptions options = new DbContextOptions();
-            options.RawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            options.AddExtension(new SqlServerOptionsExtension());
+            Assert.Equal(
+                Strings.MaxBatchSizeMustBePositive,
+                Assert.Throws<InvalidOperationException>(() => { new SqlServerOptionsExtension().MaxBatchSize = -1; }).Message);
+        }
 
-            var optionsExtension = options.Extensions.OfType<SqlServerOptionsExtension>().First();
+        [Fact]
+        public void Configure_sets_MaxBatchSize_to_value_specified_in_raw_options()
+        {
+            var rawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { MaxBatchSizeKey, "1" } };
+            var optionsExtension = new SqlServerOptionsExtension();
+
+            optionsExtension.Configure(rawOptions);
+
+            Assert.Equal(1, optionsExtension.MaxBatchSize);
+        }
+
+        [Fact]
+        public void Configure_does_not_set_MaxBatchSize_if_value_already_set()
+        {
+            var optionsExtension = new SqlServerOptionsExtension { MaxBatchSize = 42 };
+
+            var rawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { MaxBatchSizeKey, "1" } };
+
+            optionsExtension.Configure(rawOptions);
+
+            Assert.Equal(42, optionsExtension.MaxBatchSize);
+        }
+
+
+        [Fact]
+        public void Configure_does_not_set_MaxBatchSize_if_not_specified_in_raw_options()
+        {
+            var rawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var optionsExtension = new SqlServerOptionsExtension();
+
+            optionsExtension.Configure(rawOptions);
 
             Assert.Null(optionsExtension.MaxBatchSize);
         }
 
         [Fact]
-        public void Throws_on_invalid_MaxBatchSize_specified_in_dbContextOptions()
+        public void Configure_throws_if_MaxBatchSize_specified_in_raw_options_is_invalid()
         {
-            IDbContextOptions options = new DbContextOptions();
-            options.RawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "SqlServer:MaxBatchSize", "one" } };
+            var rawOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { MaxBatchSizeKey, "one" } };
 
-            Assert.Equal(Strings.IntegerConfigurationValueFormatError("SqlServer:MaxBatchSize", "one"),
-                Assert.Throws<InvalidOperationException>(() => options.AddExtension(new SqlServerOptionsExtension())).Message);
+            Assert.Equal(
+                Strings.IntegerConfigurationValueFormatError(MaxBatchSizeKey, "one"),
+                Assert.Throws<InvalidOperationException>(() => new SqlServerOptionsExtension().Configure(rawOptions)).Message);
         }
     }
 }
